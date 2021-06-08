@@ -6,7 +6,7 @@ import logger from '@wdio/logger'
 import type { Services, Capabilities, Options, Frameworks } from '@wdio/types'
 import type { Browser, MultiRemoteBrowser } from 'webdriverio'
 
-import { isUnifiedPlatform } from './utils'
+import { isUnifiedPlatform, ansiRegex } from './utils'
 import { SauceServiceConfig } from './types'
 import { DEFAULT_OPTIONS } from './constants'
 
@@ -120,7 +120,7 @@ export default class SauceService implements Services.ServiceInstance {
 
     private _reportErrorLog (error: Error) {
         const lines = (error.stack || '').split(/\r?\n/).slice(0, this._maxErrorStackLength)
-        lines.forEach((line:string) => this._browser!.execute('sauce:context=' + line))
+        lines.forEach((line:string) => this._browser!.execute(`sauce:context=${line.replace(ansiRegex(), '')}`))
     }
 
     afterTest (test: Frameworks.Test, context: unknown, results: Frameworks.TestResult) {
@@ -213,9 +213,18 @@ export default class SauceService implements Services.ServiceInstance {
         ;(this._browser as Browser<'async'>).execute('sauce:context=Scenario: ' + scenarioName)
     }
 
-    afterScenario(world: Frameworks.World) {
+    /**
+     *
+     * Runs before a Cucumber Scenario.
+     * @param world world object containing information on pickle and test step
+     * @param result result object containing
+     * @param result.passed   true if scenario has passed
+     * @param result.error    error stack if scenario failed
+     * @param result.duration duration of scenario in milliseconds
+     */
+    afterScenario(world: Frameworks.World, result: Frameworks.PickleResult) {
         // check if scenario has failed
-        if (world.result && world.result.status === 6) {
+        if (!result.passed) {
             ++this._failures
         }
     }
